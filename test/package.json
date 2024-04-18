@@ -1,0 +1,10 @@
+{
+    "name": "@hoge1e3/fs-test",
+    "main": "./nw.html",
+    "single-instance": false,
+    "window": {
+      "width": 1024,
+      "height": 768,
+      "toolbar"	: true
+    }
+  }

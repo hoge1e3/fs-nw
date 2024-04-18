@@ -1,0 +1,23 @@
+{
+  "name": "fs-nw",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "@hoge1e3/fs extention for nw.js, supporting native fs.",
+  "main": "index.js",
+  "scripts": {
+    "build-dev": "npx webpack --mode=development",
+    "build": "npx webpack --mode=production && node build/addBrace.js",
+    "test-browser": "npx http-server -o test/browser.html",
+    "test-node": "node test/test_node.mjs",
+    "test-nw": "node test/test_nw.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@hoge1e3/fs": "^1.0.0"
+  },
+  "devDependencies": {
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.1.4"
+  }
+}
