@@ -457,6 +457,12 @@ function chkCpy(f) {
     //console.log(peekStorage(f));
     //console.log(peekStorage(tmp));
     checkSame(f, tmp);
+    
+    // bin->Uint8Array->bin
+    let c2=Content.bin(b, f.contentType());
+    let bins=c2.toArrayBuffer();
+    console.log("bins",b,c2,bins);
+    tmp.setBytes(new Uint8Array(bins));
     tmp.text("DUMMY");
 
 
