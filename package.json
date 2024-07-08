@@ -1,7 +1,7 @@
 {
   "name": "@hoge1e3/fs-nw",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "@hoge1e3/fs extention for nw.js, supporting native fs.",
   "main": "src/index.js",
   "scripts": {

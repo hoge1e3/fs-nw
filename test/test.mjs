@@ -1,4 +1,4 @@
-/* global requirejs */
+/* global requirejs, console, setTimeout, alert, location, process, localStorage, document, Buffer */
 import romk_f from "./ROM_k.mjs";
 const _root=(function (){
     if (typeof window!=="undefined") return window;
@@ -226,6 +226,7 @@ try {
             var apText = "\n//tuikasitayo-n\n";
             appended.appendText(apText);
             assert.eq(beforeAppend.text() + apText, appended.text());
+            checkMtime(appended);
         }
         console.log(testd.rel("test.txt").path(), testd.rel("test.txt").text());
         testd.rel("test.txt").text(romd.rel("Actor.tonyu").text() + ABCD + CDEF);
@@ -308,6 +309,7 @@ try {
         // blob->blob
         var f = testd.rel("hoge.txt");
         f.text("hogefuga");
+        checkMtime(f);
         var tmp = testd.rel("fuga.txt");
         var b = f.getBlob();
         console.log("BLOB reading...", f.name(), tmp.name());
@@ -376,7 +378,7 @@ try {
     console.log("#"+pass+" test passed. ");
     if (pass==1) {
         await timeout(1000);
-        if (typeof location!=="undefined") location.reload();
+        if (typeof location!=="undefined" && !location.href.match(/pass1only/)) location.reload();
     } else {
         console.log("All test passed.");
     }
@@ -652,6 +654,13 @@ async function checkWatch(testd) {
         "change:"
     ].join("\n"), "checkWatch");
 
+}
+function checkMtime(f) {
+    const t=f.lastUpdate();
+    const nt=t-30*60*1000;
+    f.setMetaInfo({lastUpdate:nt});
+    console.log("checkMtime", f.path(), t, nt);
+    assert(Math.abs(f.lastUpdate()-nt)<2000);
 }
 async function checkZip(dir) {
     await timeout(3000);

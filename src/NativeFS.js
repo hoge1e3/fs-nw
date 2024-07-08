@@ -115,15 +115,21 @@ FS.delegateMethods(NativeFS.prototype, {
     },
     getMetaInfo: function (path, options) {
         this.assertExist(path, options);
-        var s = this.stat(path);
+        const s = this.stat(path);
         s.lastUpdate = s.mtime.getTime();
         return s;
     },
     setMetaInfo: function (path, info, options) {
         E(path, info, options);
-        //options.lastUpdate
-
-        //TODO:
+        this.assertExist(path, options);
+        const s = this.stat(path);
+        let atime=s.atime.getTime();
+        let mtime=s.mtime.getTime();
+        if (info.lastUpdate) {
+            mtime=info.lastUpdate;
+            const np = this.toNativePath(path);
+            fs.utimesSync(np, new Date(atime), new Date(mtime));
+        }
     },
     isReadOnly: function (path) {
         E(path);
