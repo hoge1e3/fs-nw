@@ -14,7 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoge1e3/fs": "^1.0.0"
+    "@hoge1e3/fs": "^1.0.4"
   },
   "devDependencies": {
     "webpack": "^5.91.0",

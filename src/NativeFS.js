@@ -156,7 +156,7 @@ FS.delegateMethods(NativeFS.prototype, {
         if (pa) this.getRootFS().resolveFS(pa).mkdir(pa);
         var np = this.toNativePath(path);
         fs.mkdirSync(np);
-        return this.assertExist(np);
+        return this.assertExist(path);
     },
     opendir: function (path, options) {
         assert.is(arguments, [String]);
@@ -207,7 +207,8 @@ FS.delegateMethods(NativeFS.prototype, {
             this.mkdir(path);
         } else if (this.exists(path) /*&& !this.isDir(path)*/) {
             // TODO(setlastupdate)
-            fs.utimesSync(path, Date.now() / 1000, Date.now() / 1000);
+            const np = this.toNativePath(path);
+            fs.utimesSync(np, Date.now() / 1000, Date.now() / 1000);
         }
     },
     getURL: function (path) {
@@ -219,7 +220,8 @@ FS.delegateMethods(NativeFS.prototype, {
         options = options || {};
         var isDir = this.isDir(apath);
         //console.log("Invoke oao",options);
-        var w = fs.watch(apath, options, function (evt, rpath) {
+        const np = this.toNativePath(apath);
+        var w = fs.watch(np, options, function (evt, rpath) {
             //console.log(path);
             var fpath = isDir ? P.rel(apath, rpath) : apath;
             var meta;

@@ -98,7 +98,7 @@ try {
     assert(P.isChildOf("c:\\hoge/fuga\\piyo//", "c:\\hoge\\fuga/"), "isChildOf");
     assert(!P.isChildOf("c:\\hoge/fuga\\piyo//", "c:\\hoge\\fugo/"), "!isChildOf");
     testContent();
-    var nfs;
+    let nfs;
     assert(typeof process==="undefined" || NativeFS.available, "Native FS not avail in node");
     if (NativeFS.available) {
         /*global require*/
@@ -111,10 +111,11 @@ try {
 
         var nfsp = P.rel( P.directorify( process.cwd()) , "fixture/");// "C:/bin/Dropbox/workspace/fsjs/fs/";//P.rel(PathUtil.directorify(process.cwd()), "fs/");
         console.log(nfsp);
-        var nfso;
+        let nfso;
         rootFS.mount("/fs/", nfso = new NativeFS(nfsp));
         assert(nfso.exists("/fs/"), "/fs/ not exists");
-        nfs = root.rel("fs/");
+        cd=nfs = root.rel("fs/");
+        assert(nfs.rel("Tonyu/").exists(),nfs+" not exists");
     }
     var r = cd.ls();
     console.log(r);
@@ -168,7 +169,8 @@ try {
         assert.eq(tncnt, 33, "tncnt");
 
         assert(testd.rel("sub/").exists());
-        assert(rootFS.get("/testdir/sub/").exists());
+        if (!nfs) assert(rootFS.get("/testdir/sub/").exists());
+        else assert(nfs.rel("testdir/sub/").exists());
         assert(testf.exists());
         var sf = testd.setPolicy({ topDir: testd });//SandBoxFile.create(testd._clone());
         assert(sf.rel("test.txt").text() == ABCD);
@@ -390,6 +392,9 @@ try {
     } catch (e) {
         console.error(e);
     }
+}
+function chkDU(){
+    
 }
 async function chkBigFile(testd) {
     var cap = LSFS.getCapacity();
@@ -630,10 +635,13 @@ async function asyncTest(testd) {
 }
 async function checkWatch(testd) {
     const buf = [];
+    const isN = testd.getFS() instanceof NativeFS;
+    console.log("isN",testd.getFS(), testd.getFS() instanceof NativeFS);
     const w = testd.watch((type, f) => {
         buf.push(type + ":" + f.relPath(testd));
     });
     async function buildScrap(f, t = "aaa") {
+        console.log("buildScrap",f.path());
         await timeout(100);
         f.text(t);
         await timeout(100);
@@ -645,14 +653,20 @@ async function checkWatch(testd) {
     w.remove();
     await buildScrap(testd.rel("hogefuga.txt"));
     console.log("checkWatch", buf);
-    assert.eq(buf.join("\n"), [
+    assert.eq(buf.join("\n"), (isN?[
+        "rename:hogefuga.txt",
+        "change:hogefuga.txt",
+        "change:hogefuga.txt",
+        "change:hogefuga.txt",
+        //"change:hogefuga.txt",
+    ]:[
         "create:hogefuga.txt",
         "change:",
         "change:hogefuga.txt",
         "change:",
         "delete:hogefuga.txt",
         "change:"
-    ].join("\n"), "checkWatch");
+    ]).join("\n"), "checkWatch");
 
 }
 function checkMtime(f) {
@@ -690,6 +704,7 @@ async function checkZip(dir) {
             Math.floor(tre[k].lastUpdate / 1000) -
             Math.floor(tre2[k2].lastUpdate / 1000)) <= 1);
     }
+    await timeout(1000);
 }
 }// of main()
 _root.main=main;
