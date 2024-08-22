@@ -75,6 +75,7 @@ try {
     rootFS.mount("http://127.0.0.1:8080/", new WebFS());
     rootFS.get("/var/").mkdir();
     window.rfs = rootFS;
+    window.FS= FS;
     FS.init(rootFS);
     // check cannot mount which is already exists (別にできてもいいじゃん)
     /*assert.ensureError(function (){
