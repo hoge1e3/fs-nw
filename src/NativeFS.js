@@ -43,7 +43,7 @@ Pro.toNativePath = function (path) {
 };
 Pro.arrayBuffer2Buffer = function (a) {
     if (a instanceof ArrayBuffer) {
-        var b = new Buffer(new Uint8Array(a));
+        var b = Buffer.from(new Uint8Array(a));
         return b;
     }
     return a;
@@ -237,7 +237,7 @@ FS.delegateMethods(NativeFS.prototype, {
                 w.close();
             }
         };
-    }
+    },
 });
 return NativeFS;
 }
