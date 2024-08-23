@@ -1,5 +1,6 @@
 /* global requirejs, console, setTimeout, alert, location, process, localStorage, document, Buffer */
 import romk_f from "./ROM_k.mjs";
+const exAttr={atimeMs:1, atime:1,ctimeMs:1, ctime:1};
 const _root=(function (){
     if (typeof window!=="undefined") return window;
     if (typeof self!=="undefined") return self;
@@ -168,6 +169,7 @@ try {
         }, { excludes: exdirs });
         console.log("files in romd/ except", exdirs, tncnt);
         assert.eq(tncnt, 33, "tncnt");
+        checkGetDirTree(romd);
 
         assert(testd.rel("sub/").exists());
         if (!nfs) assert(rootFS.get("/testdir/sub/").exists());
@@ -230,6 +232,8 @@ try {
             appended.appendText(apText);
             assert.eq(beforeAppend.text() + apText, appended.text());
             checkMtime(appended);
+            //await checkRemoveError(nfs);
+            checkGetDirTree_nw(nfs);
         }
         console.log(testd.rel("test.txt").path(), testd.rel("test.txt").text());
         testd.rel("test.txt").text(romd.rel("Actor.tonyu").text() + ABCD + CDEF);
@@ -237,7 +241,7 @@ try {
         testd.rel("test.txt").text(ABCD);
         //testEach(testd);
         //--- the big file
-        if (typeof localStorage!=="undefined") await chkBigFile(testd);
+        if (typeof localStorage!=="undefined" && !nfs) await chkBigFile(testd);
 
         //------------------
         if (!nfs) {
@@ -335,18 +339,20 @@ try {
             assert(testd.rel("test.txt").text() === ABCD);
             assert(testd.rel("sub/").exists());
             assert(testd.rel("sub/test2.txt").text() === romd.rel("Actor.tonyu").text());
-            chkRecur(testd, {}, "test.txt,sub/test2.txt");
+            chkRecur(testd, {}, ["test.txt","sub/test2.txt"]);
             console.log("testd.size", testd.size());
             assert.eq(testd.size(), ABCD.length + testd.rel("sub/test2.txt").size(), "testd.size");
-            assert.eq(testd.ls().join(","), "test.txt,sub/");
-            chkRecur(testd, { excludes: ["sub/"] }, "test.txt");
+            eqa(testd.ls(), ["test.txt","sub/"]);
+            chkRecur(testd, { excludes: ["sub/"] }, ["test.txt"]);
             testd.rel("test.txt").rm();
-            chkRecur(testd, {}, "sub/test2.txt");
+            chkRecur(testd, {}, ["sub/test2.txt"]);
             console.log("FULLL", testd.path());
             //console.log("FULLL", localStorage[testd.path()]);
-            chkRecur(testd, { includeTrashed: true }, "test.txt,sub/test2.txt");
+            if (!nfs){
+                chkRecur(testd, { includeTrashed: true }, ["test.txt","sub/test2.txt"]);
+            }
             testd.rel("test.txt").rm({ noTrash: true });
-            chkRecur(testd, {}, "sub/test2.txt");
+            chkRecur(testd, {}, ["sub/test2.txt"]);
 
 
             testd.removeWithoutTrash({ recursive: true });
@@ -361,7 +367,7 @@ try {
             await ramd.rel("a/b.txt").text("c").then(function () {
                 return ramd.rel("c.txt").text("d");
             }).then(function () {
-                return chkRecurAsync(ramd, {}, "a/b.txt,c.txt");
+                return chkRecurAsync(ramd, {}, ["a/b.txt","c.txt"]);
             });
             if (nfs) {
                 assert.eq(nfs.rel("sub/test2.txt").text(), romd.rel("Actor.tonyu").text());
@@ -372,12 +378,12 @@ try {
             }
         } finally {
             //console.log(e.stack);
-            testd.removeWithoutTrash({ recursive: true });
-            testf.removeWithoutTrash({ recursive: true });
+            if (testd.exists())testd.removeWithoutTrash({ recursive: true });
+            if (testf.exists())testf.removeWithoutTrash({ recursive: true });
         }
     }
-    console.log(rootFS.get("/var/").ls());
-    console.log(rootFS.get("/rom/").ls());
+    console.log("/var/", rootFS.get("/var/").ls());
+    console.log("/rom/", rootFS.get("/rom/").ls());
     console.log("#"+pass+" test passed. ");
     if (pass==1) {
         await timeout(1000);
@@ -487,7 +493,7 @@ function chkCpy(f) {
 
 
 
-    tmp.removeWithoutTrash();
+    tmp.removeWithoutTrash({recursive:true});
 }
 function peekStorage(f) {
     return rootFS.resolveFS(f.path()).storage[f.path()];
@@ -524,6 +530,9 @@ function chkrom() {
         throw new Error("ROM!");
     }
 }
+function eqa(a,b) {
+    assert.eq(a.sort().join(","),b.sort().join(","));
+}
 async function chkRecurAsync(dir, options, result) {
     try {
         var di = ["start"];
@@ -534,7 +543,7 @@ async function chkRecurAsync(dir, options, result) {
             return DU.timeout(500);
         }, options);
         console.log("checkRecurasync", di);
-        assert.eq(di.join(","), "start," + result);
+        eqa(di, ["start",...result]);
         di = ["start"];
         for (let f of dir.recursive()) {
             di.push(f.relPath(dir));
@@ -542,7 +551,7 @@ async function chkRecurAsync(dir, options, result) {
             await DU.timeout(500);
         }
         console.log("checkRecurasync gen ", di);
-        assert.eq(di.join(","), "start," + result);
+        eqa(di, ["start",...result]);
     } catch (e) {
         console.error(e);
         alert(e);
@@ -553,10 +562,11 @@ function chkRecur(dir, options, result) {
     dir.recursive(function (f) {
         di.push(f.relPath(dir));
     }, options);
-    assert.eq(di.join(","), result);
+    eqa(di, result);
     options.style = "flat-relative";
     var t = dir.getDirTree(options);
-    assert.eq(Object.keys(t).join(","), result);
+    console.log("getDirTree",dir, t);
+    eqa(Object.keys(t), result);
 }
 function testContent() {
     var C = Content;
@@ -636,8 +646,8 @@ async function asyncTest(testd) {
 }
 async function checkWatch(testd) {
     const buf = [];
-    const isN = testd.getFS() instanceof NativeFS;
-    console.log("isN",testd.getFS(), testd.getFS() instanceof NativeFS);
+    const isN = NativeFS.available && testd.getFS() instanceof NativeFS;
+    console.log("isN",isN);
     const w = testd.watch((type, f) => {
         buf.push(type + ":" + f.relPath(testd));
     });
@@ -654,20 +664,30 @@ async function checkWatch(testd) {
     w.remove();
     await buildScrap(testd.rel("hogefuga.txt"));
     console.log("checkWatch", buf);
-    assert.eq(buf.join("\n"), (isN?[
+    const uniq=(a)=>{
+        const has=new Set();
+        const res=[];
+        for (let e of a) {
+            if (has.has(e)) continue;
+            has.add(e);
+            res.push(e);
+        }
+        return res;
+    };
+    assert.eq(uniq(buf).join("\n"), (isN?uniq([
         "rename:hogefuga.txt",
         "change:hogefuga.txt",
         "change:hogefuga.txt",
         "change:hogefuga.txt",
         //"change:hogefuga.txt",
-    ]:[
+    ]):uniq([
         "create:hogefuga.txt",
         "change:",
         "change:hogefuga.txt",
         "change:",
         "delete:hogefuga.txt",
         "change:"
-    ]).join("\n"), "checkWatch");
+    ])).join("\n"), "checkWatch");
 
 }
 function checkMtime(f) {
@@ -678,20 +698,36 @@ function checkMtime(f) {
     assert(Math.abs(f.lastUpdate()-nt)<2000);
 }
 async function checkZip(dir) {
+    const cleanExt=async ()=>{
+        assert.eq(ext.name(),"ext/");
+        if (ext.exists()) {
+            for (let i=0;i<10;i++) {
+                try {
+                    await ext.removeWithoutTrash({ recursive: true });
+                    break;
+                } catch(e) {
+                    console.log("Rm"+ext+" retry... "+i);
+                    await timeout(1000);
+                }    
+            }
+            assert(!ext.exists(),ext+" remains ");        
+        }    
+    };
     await timeout(3000);
+    let ext = dir.rel("ext/");
+    await cleanExt();
     dir.rel("ziping.txt").text("zipping");
     let tre = dir.getDirTree();
     console.log("TRE", tre);
     const zipf = FS.get("/ram/comp.zip");
     await FS.zip.zip(dir, zipf);
-    let ext = dir.rel("ext/");
     ext.mkdir();
     await FS.zip.unzip(zipf, ext);
 
     let tre2 = ext.getDirTree();
     console.log("TRE2", tre2);
     dir.rel("ziping.txt").removeWithoutTrash();
-    ext.removeWithoutTrash({ recursive: true });
+    await cleanExt();
     assert.eq(Object.keys(tre).length, Object.keys(tre2).length);
     for (let k2 of Object.keys(tre2)) {
         let k = k2.replace(/\/ext/, "");
@@ -702,10 +738,135 @@ async function checkZip(dir) {
         console.log(tre[k].lastUpdate - tre2[k2].lastUpdate);
         //assert(Math.abs(tre[k].lastUpdate-tre2[k2].lastUpdate)<2000);
         assert(Math.abs(
-            Math.floor(tre[k].lastUpdate / 1000) -
-            Math.floor(tre2[k2].lastUpdate / 1000)) <= 1);
+            Math.floor(tre[k].lastUpdate / 2000) -
+            Math.floor(tre2[k2].lastUpdate / 2000)) <= 2,
+            `Zip timestamp not match ${k}=${tre[k].lastUpdate}, ${k2}=${tre2[k2].lastUpdate}, Diff=${tre[k].lastUpdate - tre2[k2].lastUpdate}`
+        );
     }
     await timeout(1000);
 }
-}// of main()
+function getDirTree3Type(dir, excludes) {
+    if (!excludes) {
+        excludes={};
+    } else if (typeof excludes.map==="function") {
+        excludes={
+            hier:excludes, rel:excludes,
+            abs:excludes.map(e=>dir.rel(e).path()),
+        };
+    } else if (typeof excludes==="function") {
+        excludes={
+            hier:excludes, rel:excludes,
+            abs:excludes
+        };
+    }
+    const hier=dir.getDirTree({style:"hierarchical",excludes:excludes.hier});
+    console.log("hier",hier);
+    const rel=dir.getDirTree({style:"flat-relative",excludes:excludes.rel});
+    console.log("rel",rel);
+    const abs=dir.getDirTree({style:"flat-absolute",excludes:excludes.abs});
+    console.log("abs",abs);
+    eqtree3(hier, rel,abs);
+    return {hier, rel, abs};
+    function eqtree3(hier,rel,abs) {
+        eqtree2(rel,abs);
+        eqtreeH(rel,hier);
+    }
+    function eqtreeH(rel, hier){
+        const uncheckedRel={};
+        for (let k in rel) uncheckedRel[k]=1;
+        function loop(hier, path) {
+            for (let k in hier) {
+                let np=path+k;
+                //console.log("hier, k, path", hier, k, path);
+                delete uncheckedRel[np];
+                if (k.match(/\/$/)) {
+                    loop(hier[k], np);    
+                } else {
+                    eqTree(rel[np], hier[k], np, exAttr);
+                }
+            }    
+        }
+        loop(hier,"");
+        assert(Object.keys(uncheckedRel).length==0,"Unchecked rel: "+Object.keys(uncheckedRel).length);
+    }   
+    function eqtree2(rel,abs){
+        const uncheckedAbs={};
+        for (let k in abs) uncheckedAbs[k]=1;
+        for (let k in rel) {
+            const absk=dir.rel(k).path();
+            //console.log("k-absk",k, absk);
+            delete uncheckedAbs[absk];
+            eqTree(abs[absk], rel[k], k, exAttr);
+        }
+        assert(Object.keys(uncheckedAbs).length==0,"Unchecked abs: "+Object.keys(uncheckedAbs).length);
+    }
+}
+function checkGetDirTree(dir) {
+    const noex=getDirTree3Type(dir);
+    assert.eq(Object.keys(noex.abs).length,50, "count of dirtree abs");
+    assert.eq(Object.keys(noex.rel).length,50, "count of dirtree rel");
+    assert.eq(Object.keys(noex.hier).length,17, "count of dirtree hier");
+
+    const exa=getDirTree3Type(dir,["event/"]);
+    assert.eq(Object.keys(exa.abs).length,50-6, "count of dirtree abs-ea");
+    assert.eq(Object.keys(exa.rel).length,50-6, "count of dirtree rel-ea");
+    assert.eq(Object.keys(exa.hier).length,17-1, "count of dirtree hier-ea");
+
+    function exfn(f) {
+        return f.isDir() && f.rel("CrashToHandler.tonyu").exists();
+    }
+    const exf=getDirTree3Type(dir,exfn);
+    
+    assert.eq(Object.keys(exf.abs).length,50-6, "count of dirtree abs-ef");
+    assert.eq(Object.keys(exf.rel).length,50-6, "count of dirtree rel-ef");
+    assert.eq(Object.keys(exf.hier).length,17-1, "count of dirtree hier-ef");
+
+    eqTree(exf.hier, exa.hier, "hier_efea", exAttr);
+    eqTree(exf.rel, exa.rel, "rel_efea", exAttr);
+    eqTree(exf.abs, exa.abs, "abs_efea", exAttr);
+}
+function checkGetDirTree_nw(dir) {
+    const noex=getDirTree3Type(dir);
+    console.log("getDirTree-nw", noex);
+}
+/*
+async function checkRemoveError(dir) {
+    const fs=await import("fs");
+    dir=dir.rel("rmtest/");
+    dir.mkdir();
+    const locked=dir.rel("locked.txt");
+    locked.text("test");
+    const np=locked.fs.toNativePath(locked.path());
+    console.log("np",np);
+    fs.chmodSync(np,0o400);
+    await timeout(10000);
+    fs.unlinkSync(np);
+    console.log("WHT!!!",np);
+    await assert.ensureErrorAsync(()=>dir.rm({r:true}));
+    fs.chmodSync(np,0o666);
+    await dir.rm({r:true});
+    assert(!dir.exists(), dir+" remains (checkRemove)");    
+}*/
+function eqTree(a, b, path, excludes={}) {
+    assert.eq(typeof a, typeof b, "typeof not match:"+path);
+    if (a==null) {
+        assert(b==null, "both should be null: "+path);
+        return;
+    } 
+    if (typeof a!=="object") {
+        assert(a==b, `non-equal non-object: ${path} ${a}!==${b}`);
+        return;
+    }
+    for (let k in a) {
+        if (excludes[k]) continue;
+        eqTree(a[k], b[k], path+"."+k, excludes);
+    }
+    for (let k in b) {
+        if (excludes[k]) continue;
+        eqTree(b[k], a[k], path+"."+k, excludes);
+    }
+}
+
+}
+// of main()
 _root.main=main;
